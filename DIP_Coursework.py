@@ -223,6 +223,8 @@ def unsharp_masking_filter(image, mask_size=3, k=1):
    Apply an unsharp masking filter to an image.
    """
 
+   start_time = time.time()
+
    # Pad the image to handle borders
    padded_image = np.pad(image, ((mask_size//2, mask_size//2), (mask_size//2, mask_size//2)), mode='edge')
    unsharp_filtered_image = np.zeros_like(image)
@@ -239,7 +241,41 @@ def unsharp_masking_filter(image, mask_size=3, k=1):
 
          unsharp_filtered_image[i, j] = neighborhood_mean + k * (image[i, j] - neighborhood_mean)
 
+   end_time = time.time()
+   print(f"Unsharp masking filter applied in {end_time - start_time:.2f} seconds.")
+
    return unsharp_filtered_image
+
+def lee_filter(image, mask_size=3, noise_variance=0.01):
+   """
+   Apply a Lee filter to an image.
+   """
+
+   start_time = time.time()
+
+   # Pad the image to handle borders
+   padded_image = np.pad(image, ((mask_size//2, mask_size//2), (mask_size//2, mask_size//2)), mode='edge')
+   lee_filtered_image = np.zeros_like(image)
+   
+   # Cycle through each pixel in the image
+   for i in range(image.shape[0]):
+      x = i + (mask_size - 1) // 2
+      for j in range(image.shape[1]):
+         y = j + (mask_size - 1) // 2
+         # Extract the neighborhood
+         neighborhood = padded_image[(x-(mask_size-1)//2):(x+(mask_size-1)//2), (y-(mask_size-1)//2):(y+(mask_size-1)//2)]
+
+         local_mean = np.mean(neighborhood)
+         local_variance = np.var(neighborhood)
+
+         weight = local_variance / (local_variance + noise_variance)
+
+         lee_filtered_image[i, j] = local_mean + weight * (image[i, j] - local_mean)
+
+   end_time = time.time()
+   print(f"Lee filter applied in {end_time - start_time:.2f} seconds.")
+
+   return lee_filtered_image
 
 def edge_detection(image, method='sobel3'):
    """
@@ -292,70 +328,85 @@ def histogram_median(hist, mask_size):
 if __name__ == "__main__":
    # Load image
    image_path = "Files/NZJers1.png"
+   # image_path = "Files/foetus.png"
    pre_process_image = np.asarray(load_image(image_path))
 
    # Image processing
    mask_size = 9
 
-   post_process_image1 = basic_median_filter(pre_process_image, mask_size)
-   post_process_image2 = Huang_median_filter(pre_process_image, mask_size)
-   post_process_image3 = improved_Huang_median_filter(pre_process_image, mask_size)
+   median_filtered_image = improved_Huang_median_filter(pre_process_image, mask_size)
+   mean_filtered_image = basic_mean_filter(median_filtered_image, mask_size)
+   unsharp_filtered_image = unsharp_masking_filter(median_filtered_image, mask_size, 0.2)
+   lee_filtered_image = lee_filter(median_filtered_image, mask_size, 0.01)
 
    # Edge detection for evaluation
    edges_before = edge_detection(pre_process_image)
-   edges_after1 = edge_detection(post_process_image1)
-   edges_after2 = edge_detection(post_process_image2)
-   edges_after3 = edge_detection(post_process_image3)
+   edges_after1 = edge_detection(median_filtered_image)
+   edges_after2 = edge_detection(mean_filtered_image)
+   edges_after3 = edge_detection(unsharp_filtered_image)
+   edges_after4 = edge_detection(lee_filtered_image)
 
    # Display results
-   plt.figure(figsize=(10, 5))
+   plt.figure(figsize=(15, 8))
 
    # Pre-processed image
-   plt.subplot(2, 4, 1)
+   plt.subplot(2, 5, 1)
    plt.imshow(pre_process_image)
    plt.title("Original Image")
    plt.axis('off')
 
    # Post-processed image
-   plt.subplot(2, 4, 2)
-   plt.imshow(post_process_image1)
-   plt.title("Processed Image 1")
+   plt.subplot(2, 5, 2)
+   plt.imshow(median_filtered_image)
+   plt.title("Median Filtered Image")
    plt.axis('off')
 
    # Post-processed image
-   plt.subplot(2, 4, 3)
-   plt.imshow(post_process_image2)
-   plt.title("Processed Image 2")
+   plt.subplot(2, 5, 3)
+   plt.imshow(mean_filtered_image)
+   plt.title("Mean Filtered Image")
    plt.axis('off')
 
    # Post-processed image
-   plt.subplot(2, 4, 4)
-   plt.imshow(post_process_image3)
-   plt.title("Processed Image 3")
+   plt.subplot(2, 5, 4)
+   plt.imshow(unsharp_filtered_image)
+   plt.title("Unsharp Masked Image")
+   plt.axis('off')
+
+   # Post-processed image
+   plt.subplot(2, 5, 5)
+   plt.imshow(lee_filtered_image)
+   plt.title("Lee Filtered Image")
    plt.axis('off')
 
    # Edges before processing
-   plt.subplot(2, 4, 5)
+   plt.subplot(2, 5, 6)
    plt.imshow(edges_before, cmap='gray')
    plt.title("Edges Before Processing")
    plt.axis('off')
 
    # Edges after processing
-   plt.subplot(2, 4, 6)
+   plt.subplot(2, 5, 7)
    plt.imshow(edges_after1, cmap='gray')
-   plt.title("Edges After Processing 1")
+   plt.title("Edges After Median Filter")
    plt.axis('off')
 
    # Edges after processing
-   plt.subplot(2, 4, 7)
+   plt.subplot(2, 5, 8)
    plt.imshow(edges_after2, cmap='gray')
-   plt.title("Edges After Processing 2")
+   plt.title("Edges After Mean Filter")
    plt.axis('off')
 
    # Edges after processing
-   plt.subplot(2, 4, 8)
+   plt.subplot(2, 5, 9)
    plt.imshow(edges_after3, cmap='gray')
-   plt.title("Edges After Processing 3")
+   plt.title("Edges After Unsharp Mask")
+   plt.axis('off')
+
+   # Edges after unsharp masking
+   plt.subplot(2, 5, 10)
+   plt.imshow(edges_after4, cmap='gray')
+   plt.title("Edges After Lee Filter")
    plt.axis('off')
 
    # Display the figure
