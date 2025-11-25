@@ -14,11 +14,13 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 import time
 
+# Image import function
 def load_image(image_path):
    """Load an image from the specified path."""
    image = plt.imread(image_path)
    return image
 
+# Non-linear filters
 def basic_median_filter(image, mask_size=3):
    """
    Apply a median filter to an image. 
@@ -155,6 +157,55 @@ def improved_Huang_median_filter(image, mask_size=3):
    print(f"Improved Huang efficient median filter applied in {end_time - start_time:.2f} seconds.")
    return median_filtered_image
 
+def lee_filter(image, mask_size=3, noise_variance=0.01):
+   """
+   Apply a Lee filter to an image.
+   """
+
+   start_time = time.time()
+
+   # Pad the image to handle borders
+   padded_image = np.pad(image, ((mask_size//2, mask_size//2), (mask_size//2, mask_size//2)), mode='edge')
+   lee_filtered_image = np.zeros_like(image)
+   
+   # Cycle through each pixel in the image
+   for i in range(image.shape[0]):
+      x = i + (mask_size - 1) // 2
+      for j in range(image.shape[1]):
+         y = j + (mask_size - 1) // 2
+         # Extract the neighborhood
+         neighborhood = padded_image[(x-(mask_size-1)//2):(x+(mask_size-1)//2), (y-(mask_size-1)//2):(y+(mask_size-1)//2)]
+
+         local_mean = np.mean(neighborhood)
+         local_variance = np.var(neighborhood)
+
+         weight = local_variance / (local_variance + noise_variance)
+
+         lee_filtered_image[i, j] = local_mean + weight * (image[i, j] - local_mean)
+
+   end_time = time.time()
+   print(f"Lee filter applied in {end_time - start_time:.2f} seconds.")
+
+   return lee_filtered_image
+
+def non_local_mean_filter(image, patch_size=3, search_window_size=7, h=0.1):
+   """
+   Apply a non-local means filter to an image.
+   """
+   start_time = time.time()
+
+   # Image intensity log transform (noise becomes additive rather than multiplicative)
+   image_log = np.log1p(image.astype(float) + 1e-10)
+   nlm_image = np.zeros_like(image_log)
+
+   
+
+   end_time = time.time()
+   print(f"Non-local means filter applied in {end_time - start_time:.2f} seconds.")
+
+   return
+
+# Linear filters
 def basic_mean_filter(image, mask_size=3):
    """Apply a mean filter to an image."""
 
@@ -181,12 +232,27 @@ def basic_mean_filter(image, mask_size=3):
 
    return mean_filtered_image
 
-def efficient_mean_filter(image, mask_size=3):
-   """Apply an efficient mean filter to an image."""
+def gaussian_lowpass_filter(image, mask_size=3, sigma=1):
+   """
+   A linear Gaussian low-pass filter to smooth an image.
+   """
+
+   time_start = time.time()
+
+   # Create Gaussian kernel
+   Gx = np.zeros((mask_size, mask_size))
+   center = mask_size // 2
+   for i in range(mask_size):
+      for j in range(mask_size):
+         Gx[i, j] = np.exp(-((i - center)**2 + (j - center)**2) / (2 * sigma**2))
    
-   # TBC
-   
-   pass
+   # Convolve with Gaussian kernel
+   image = ndimage.convolve(image.astype(float), Gx)
+
+   time_end = time.time()
+   print(f"Gaussian low-pass filter applied in {time_end - time_start:.2f} seconds.")
+
+   return image
 
 def sharpening_filter(image, type='K5'):
    """
@@ -246,37 +312,7 @@ def unsharp_masking_filter(image, mask_size=3, k=1):
 
    return unsharp_filtered_image
 
-def lee_filter(image, mask_size=3, noise_variance=0.01):
-   """
-   Apply a Lee filter to an image.
-   """
-
-   start_time = time.time()
-
-   # Pad the image to handle borders
-   padded_image = np.pad(image, ((mask_size//2, mask_size//2), (mask_size//2, mask_size//2)), mode='edge')
-   lee_filtered_image = np.zeros_like(image)
-   
-   # Cycle through each pixel in the image
-   for i in range(image.shape[0]):
-      x = i + (mask_size - 1) // 2
-      for j in range(image.shape[1]):
-         y = j + (mask_size - 1) // 2
-         # Extract the neighborhood
-         neighborhood = padded_image[(x-(mask_size-1)//2):(x+(mask_size-1)//2), (y-(mask_size-1)//2):(y+(mask_size-1)//2)]
-
-         local_mean = np.mean(neighborhood)
-         local_variance = np.var(neighborhood)
-
-         weight = local_variance / (local_variance + noise_variance)
-
-         lee_filtered_image[i, j] = local_mean + weight * (image[i, j] - local_mean)
-
-   end_time = time.time()
-   print(f"Lee filter applied in {end_time - start_time:.2f} seconds.")
-
-   return lee_filtered_image
-
+# Edge detection for evaluation
 def edge_detection(image, method='sobel3'):
    """
    Apply edge detection to an image to evaluate 
@@ -300,9 +336,27 @@ def edge_detection(image, method='sobel3'):
       # Edge magnitude
       G = np.hypot(Ix, Iy)       # Pythag
       G = G / G.max() * 255      # Normalize
+   elif method == 'prewitt3':
+      # Prewitt Kernels
+      Kx = np.array([[-1, 0, 1],
+                     [-1, 0, 1],
+                     [-1, 0, 1]])
+
+      Ky = np.array([[-1, -1, -1],
+                     [ 0,  0,  0],
+                     [ 1,  1,  1]])
+
+      # Convolve with Prewitt kernels
+      Ix = ndimage.convolve(image.astype(float), Kx)
+      Iy = ndimage.convolve(image.astype(float), Ky)
+
+      # Edge magnitude
+      G = np.hypot(Ix, Iy)       # Pythag
+      G = G / G.max() * 255      # Normalize
    
    return G
 
+# Helper functions
 def neighborhood_median(neighborhood):
    """
    Compute the median of a neighborhood.
@@ -332,19 +386,25 @@ if __name__ == "__main__":
    pre_process_image = np.asarray(load_image(image_path))
 
    # Image processing
-   mask_size = 9
+   mask_size = 17
+
+   if mask_size % 2 == 0:
+      print("Mask size must be odd, incrementing by 1.")
+      mask_size += 1  # Ensure mask size is odd
 
    median_filtered_image = improved_Huang_median_filter(pre_process_image, mask_size)
-   mean_filtered_image = basic_mean_filter(median_filtered_image, mask_size)
-   unsharp_filtered_image = unsharp_masking_filter(median_filtered_image, mask_size, 0.2)
-   lee_filtered_image = lee_filter(median_filtered_image, mask_size, 0.01)
+   mean_filtered_image = basic_mean_filter(pre_process_image, mask_size)
+   unsharp_filtered_image = unsharp_masking_filter(median_filtered_image, mask_size, k=0.7)
+   lee_filtered_image = lee_filter(pre_process_image, mask_size, noise_variance=0.01)
+   gaussian_filtered_image = gaussian_lowpass_filter(pre_process_image, mask_size, sigma=1)
+   non_local_mean_filtered_image = non_local_mean_filter(pre_process_image, patch_size=3, search_window_size=7, h=0.1)
 
    # Edge detection for evaluation
-   edges_before = edge_detection(pre_process_image)
-   edges_after1 = edge_detection(median_filtered_image)
-   edges_after2 = edge_detection(mean_filtered_image)
-   edges_after3 = edge_detection(unsharp_filtered_image)
-   edges_after4 = edge_detection(lee_filtered_image)
+   edges_before = edge_detection(pre_process_image, 'prewitt3')
+   edges_after1 = edge_detection(median_filtered_image, 'prewitt3')
+   edges_after2 = edge_detection(mean_filtered_image, 'prewitt3')
+   edges_after3 = edge_detection(non_local_mean_filtered_image, 'prewitt3')
+   edges_after4 = edge_detection(lee_filtered_image, 'prewitt3')
 
    # Display results
    plt.figure(figsize=(15, 8))
@@ -369,8 +429,8 @@ if __name__ == "__main__":
 
    # Post-processed image
    plt.subplot(2, 5, 4)
-   plt.imshow(unsharp_filtered_image)
-   plt.title("Unsharp Masked Image")
+   plt.imshow(non_local_mean_filtered_image)
+   plt.title("Non-Local Mean Filtered Image")
    plt.axis('off')
 
    # Post-processed image
@@ -400,7 +460,7 @@ if __name__ == "__main__":
    # Edges after processing
    plt.subplot(2, 5, 9)
    plt.imshow(edges_after3, cmap='gray')
-   plt.title("Edges After Unsharp Mask")
+   plt.title("Edges After Non-Local Mean Filter")
    plt.axis('off')
 
    # Edges after unsharp masking
