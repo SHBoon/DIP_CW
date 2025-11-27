@@ -188,7 +188,7 @@ def lee_filter(image, mask_size=3, noise_variance=0.01):
 
    return lee_filtered_image
 
-def non_local_mean_filter(image, patch_size=3, search_window_size=7, h=0.1):
+
    """
    Apply a non-local means filter to an image.
    """
@@ -336,7 +336,12 @@ def edge_detection(image, method='sobel3'):
       # Edge magnitude
       G = np.hypot(Ix, Iy)       # Pythag
       G = G / G.max() * 255      # Normalize
-   elif method == 'prewitt3':
+
+      # # Add a threshold to edges
+      # threshold = 0.11 * G.max()
+      # G = (G > threshold) * 255
+
+   elif method == 'sobel3':
       # Prewitt Kernels
       Kx = np.array([[-1, 0, 1],
                      [-1, 0, 1],
@@ -353,6 +358,10 @@ def edge_detection(image, method='sobel3'):
       # Edge magnitude
       G = np.hypot(Ix, Iy)       # Pythag
       G = G / G.max() * 255      # Normalize
+
+      # # Add a threshold to edges
+      # threshold = 0.11 * G.max()
+      # G = (G > threshold) * 255
    
    return G
 
@@ -386,28 +395,30 @@ if __name__ == "__main__":
    pre_process_image = np.asarray(load_image(image_path))
 
    # Image processing
-   mask_size = 17
+   mask_size = 21
 
    if mask_size % 2 == 0:
       print("Mask size must be odd, incrementing by 1.")
       mask_size += 1  # Ensure mask size is odd
 
+   basic_median_filtered_image = basic_median_filter(pre_process_image, mask_size)
+   huang_filtered_image = Huang_median_filter(pre_process_image, mask_size)
    median_filtered_image = improved_Huang_median_filter(pre_process_image, mask_size)
-   mean_filtered_image = basic_mean_filter(pre_process_image, mask_size)
-   unsharp_filtered_image = unsharp_masking_filter(median_filtered_image, mask_size, k=0.7)
+   # mean_filtered_image = basic_mean_filter(pre_process_image, mask_size)
+   # unsharp_filtered_image = unsharp_masking_filter(median_filtered_image, mask_size, k=0.7)
    lee_filtered_image = lee_filter(pre_process_image, mask_size, noise_variance=0.01)
-   gaussian_filtered_image = gaussian_lowpass_filter(pre_process_image, mask_size, sigma=1)
-   non_local_mean_filtered_image = non_local_mean_filter(pre_process_image, patch_size=3, search_window_size=7, h=0.1)
+   # gaussian_filtered_image = gaussian_lowpass_filter(pre_process_image, mask_size, sigma=1)
+   # sharpening_filtered_image = sharpening_filter(pre_process_image, type='K5')
 
    # Edge detection for evaluation
-   edges_before = edge_detection(pre_process_image, 'prewitt3')
-   edges_after1 = edge_detection(median_filtered_image, 'prewitt3')
-   edges_after2 = edge_detection(mean_filtered_image, 'prewitt3')
-   edges_after3 = edge_detection(non_local_mean_filtered_image, 'prewitt3')
-   edges_after4 = edge_detection(lee_filtered_image, 'prewitt3')
+   edges_before = edge_detection(pre_process_image, 'sobel3')
+   edges_after1 = edge_detection(basic_median_filtered_image, 'sobel3')
+   edges_after2 = edge_detection(huang_filtered_image, 'sobel3')
+   edges_after3 = edge_detection(median_filtered_image, 'sobel3')
+   edges_after4 = edge_detection(lee_filtered_image, 'sobel3')
 
    # Display results
-   plt.figure(figsize=(15, 8))
+   plt.figure(figsize=(15, 5))
 
    # Pre-processed image
    plt.subplot(2, 5, 1)
@@ -417,20 +428,20 @@ if __name__ == "__main__":
 
    # Post-processed image
    plt.subplot(2, 5, 2)
-   plt.imshow(median_filtered_image)
-   plt.title("Median Filtered Image")
+   plt.imshow(basic_median_filtered_image)
+   plt.title("Basic Median Filtered Image")
    plt.axis('off')
 
    # Post-processed image
    plt.subplot(2, 5, 3)
-   plt.imshow(mean_filtered_image)
-   plt.title("Mean Filtered Image")
+   plt.imshow(huang_filtered_image)
+   plt.title("Huang Median Filtered Image")
    plt.axis('off')
 
    # Post-processed image
    plt.subplot(2, 5, 4)
-   plt.imshow(non_local_mean_filtered_image)
-   plt.title("Non-Local Mean Filtered Image")
+   plt.imshow(median_filtered_image)
+   plt.title("Improved Huang Median Filtered Image")
    plt.axis('off')
 
    # Post-processed image
@@ -448,19 +459,19 @@ if __name__ == "__main__":
    # Edges after processing
    plt.subplot(2, 5, 7)
    plt.imshow(edges_after1, cmap='gray')
-   plt.title("Edges After Median Filter")
+   plt.title("Edges After Basic Median Filter")
    plt.axis('off')
 
    # Edges after processing
    plt.subplot(2, 5, 8)
    plt.imshow(edges_after2, cmap='gray')
-   plt.title("Edges After Mean Filter")
+   plt.title("Edges After Huang Median Filter")
    plt.axis('off')
 
    # Edges after processing
    plt.subplot(2, 5, 9)
    plt.imshow(edges_after3, cmap='gray')
-   plt.title("Edges After Non-Local Mean Filter")
+   plt.title("Edges After Improved Huang Median Filter")
    plt.axis('off')
 
    # Edges after unsharp masking
